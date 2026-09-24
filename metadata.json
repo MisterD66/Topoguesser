@@ -1,0 +1,6 @@
+{
+  "name": "Topoguesser",
+  "description": "Austrian Alpine Topographic Guessing Game with first-person 3D ray-cast horizon panorama, real sun simulation, and 2D Marching Squares contour maps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
