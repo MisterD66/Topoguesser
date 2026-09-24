@@ -33,10 +33,11 @@ export const CampaignSummaryModal: React.FC<CampaignSummaryModalProps> = ({
   const percent = Math.round((totalScore / maxScore) * 100);
 
   const getRank = (score: number) => {
-    if (score >= 45000) return { title: 'Legendärer Alpin-Meister', color: 'text-amber-400' };
-    if (score >= 38000) return { title: 'Erfahrener Bergführer', color: 'text-emerald-400' };
-    if (score >= 28000) return { title: 'Sicherer Gipfelstürmer', color: 'text-sky-400' };
-    if (score >= 18000) return { title: 'Ambitionierter Wanderer', color: 'text-indigo-400' };
+    const ratio = maxScore > 0 ? score / maxScore : 0;
+    if (ratio >= 0.9) return { title: 'Legendärer Alpin-Meister', color: 'text-amber-400' };
+    if (ratio >= 0.75) return { title: 'Erfahrener Bergführer', color: 'text-emerald-400' };
+    if (ratio >= 0.55) return { title: 'Sicherer Gipfelstürmer', color: 'text-sky-400' };
+    if (ratio >= 0.35) return { title: 'Ambitionierter Wanderer', color: 'text-indigo-400' };
     return { title: 'Alpen-Entdecker', color: 'text-stone-300' };
   };
 

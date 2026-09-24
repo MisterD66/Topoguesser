@@ -21,6 +21,7 @@ import {
   synthesizeLocationFromCoord,
   convertCuratedToAlpineLocation,
   estimateElevation,
+  PLAYTEST_CAMPAIGN_PLACES,
 } from './utils/curatedPlaces';
 import {
   saveCampaignCookie,
@@ -37,37 +38,29 @@ import { CampaignSummaryModal } from './components/CampaignSummaryModal';
 import { CreatorControlBar } from './components/CreatorControlBar';
 import { CuratedPlacesModal } from './components/CuratedPlacesModal';
 
-const TOTAL_ROUNDS = 10;
+const TOTAL_ROUNDS = 5;
 
 export default function App() {
-  // Mode: Only 'campaign' (curated 10-round game) or 'creator' (unlocked via password)
+  // Mode: Only 'campaign' (curated 5-round playtest game) or 'creator' (unlocked via password)
   const [gameMode, setGameMode] = useState<GameMode>('campaign');
 
   // Curated Places collection from localStorage
   const [curatedPlaces, setCuratedPlaces] = useState<CuratedPlace[]>(() => loadCuratedPlaces());
 
-  // Build the 10 campaign locations from curated places + default Austrian landmarks
+  // Build the 5 campaign locations exclusively from the playtest curated places
   const campaignLocations = useMemo<AlpineLocation[]>(() => {
     const list: AlpineLocation[] = [];
 
-    // Prioritize curated places
-    for (const place of curatedPlaces) {
-      list.push(convertCuratedToAlpineLocation(place));
-      if (list.length >= TOTAL_ROUNDS) break;
-    }
-
-    // Fill remaining spots up to 10 from master Austrian locations
-    if (list.length < TOTAL_ROUNDS) {
-      for (const loc of AUSTRIAN_LOCATIONS) {
-        if (!list.some((existing) => existing.id === loc.id)) {
-          list.push({
-            ...loc,
-            timeOfDayHour: loc.timeOfDayHour ?? 14,
-            difficulty: loc.difficulty ?? 'standard',
-            showSearchZone: loc.showSearchZone ?? true,
-            searchZoneRadiusKm: loc.searchZoneRadiusKm ?? 50,
-          });
-        }
+    // Prioritize places from curated storage if 5 exist
+    if (curatedPlaces && curatedPlaces.length >= TOTAL_ROUNDS) {
+      for (const place of curatedPlaces) {
+        list.push(convertCuratedToAlpineLocation(place));
+        if (list.length >= TOTAL_ROUNDS) break;
+      }
+    } else {
+      // Use the canonical 5 playtest locations
+      for (const place of PLAYTEST_CAMPAIGN_PLACES) {
+        list.push(convertCuratedToAlpineLocation(place));
         if (list.length >= TOTAL_ROUNDS) break;
       }
     }

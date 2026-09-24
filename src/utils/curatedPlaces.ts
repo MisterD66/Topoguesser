@@ -5,7 +5,7 @@
 
 import { AlpineLocation, AustrianBundesland, CuratedPlace, LatLng, OSMPeak } from '../types/game';
 
-const STORAGE_KEY = 'topoguesser_curated_places_v1';
+const STORAGE_KEY = 'topoguesser_curated_places_playtest_v1';
 
 export const MASTER_AUSTRIAN_PEAKS: OSMPeak[] = [
   // Hohe Tauern / Glocknergruppe
@@ -344,48 +344,129 @@ export function convertCuratedToAlpineLocation(curated: CuratedPlace): AlpineLoc
 }
 
 /**
+ * Playtest campaign: exactly 5 curated locations selected for playtesting
+ */
+export const PLAYTEST_CAMPAIGN_PLACES: CuratedPlace[] = [
+  {
+    id: 'curated-1790240548375',
+    name: 'Adlerstein',
+    mountainRange: 'Schafberg-Region · Oberösterreich',
+    bundesland: 'Oberösterreich',
+    observerPos: {
+      lat: 47.791563985367496,
+      lng: 13.472585678100588,
+    },
+    observerElevation: 1290,
+    initialHeading: 281,
+    description: 'Aussichtspunkt auf die markante Südwand des Wilden Kaisers',
+    createdAt: '2026-09-24T09:02:28.375Z',
+    targetPeakName: 'Schafberg',
+    timeOfDayHour: 15.5,
+    difficulty: 'standard',
+    showSearchZone: true,
+    searchZoneRadiusKm: 50,
+    searchZoneCenter: {
+      lat: 47.73655265353601,
+      lng: 13.672485351562502,
+    },
+  },
+  {
+    id: 'curated-1790240510416',
+    name: 'Strandbad Seewalchen',
+    mountainRange: 'Großer Höllkogel-Region · Oberösterreich',
+    bundesland: 'Oberösterreich',
+    observerPos: {
+      lat: 47.95006946020493,
+      lng: 13.590441942214968,
+    },
+    observerElevation: 550,
+    initialHeading: 229,
+    description: 'Aussichtspunkt auf die markante Südwand des Wilden Kaisers',
+    createdAt: '2026-09-24T09:01:50.416Z',
+    targetPeakName: 'Großer Höllkogel',
+    timeOfDayHour: 13,
+    difficulty: 'standard',
+    showSearchZone: true,
+    searchZoneRadiusKm: 50,
+    searchZoneCenter: {
+      lat: 47.73655265353601,
+      lng: 13.672485351562502,
+    },
+  },
+  {
+    id: 'curated-1790240379293',
+    name: 'Schafberg',
+    mountainRange: 'Schafberg-Region · Oberösterreich',
+    bundesland: 'Oberösterreich',
+    observerPos: {
+      lat: 47.77606458167728,
+      lng: 13.433672189712526,
+    },
+    observerElevation: 1757,
+    initialHeading: 46,
+    description: 'Aussichtspunkt auf die markante Südwand des Wilden Kaisers',
+    createdAt: '2026-09-24T08:59:39.293Z',
+    targetPeakName: 'Schafberg',
+    timeOfDayHour: 9.5,
+    difficulty: 'standard',
+    showSearchZone: true,
+    searchZoneRadiusKm: 50,
+    searchZoneCenter: {
+      lat: 47.73655265353601,
+      lng: 13.672485351562502,
+    },
+  },
+  {
+    id: 'curated-1790240271765',
+    name: 'Ahornkogel',
+    mountainRange: 'Hoher Sarstein-Region · Oberösterreich',
+    bundesland: 'Oberösterreich',
+    observerPos: {
+      lat: 47.63939823096526,
+      lng: 13.81532907485962,
+    },
+    observerElevation: 1800,
+    initialHeading: 267,
+    description: 'Aussichtspunkt auf die markante Südwand des Wilden Kaisers',
+    createdAt: '2026-09-24T08:57:51.765Z',
+    targetPeakName: 'Hoher Sarstein',
+    timeOfDayHour: 9.5,
+    difficulty: 'standard',
+    showSearchZone: true,
+    searchZoneRadiusKm: 50,
+    searchZoneCenter: {
+      lat: 47.73655265353601,
+      lng: 13.672485351562502,
+    },
+  },
+  {
+    id: 'curated-1790240027621',
+    name: 'Grünberg VM',
+    mountainRange: 'Traunstein-Region · Oberösterreich',
+    bundesland: 'Oberösterreich',
+    observerPos: {
+      lat: 47.898160943206086,
+      lng: 13.817796707153322,
+    },
+    observerElevation: 1025,
+    initialHeading: 316,
+    description: 'Aussichtspunkt auf die markante Südwand des Wilden Kaisers',
+    createdAt: '2026-09-24T08:53:47.621Z',
+    targetPeakName: 'Traunstein',
+    timeOfDayHour: 9.5,
+    difficulty: 'standard',
+    showSearchZone: true,
+    searchZoneRadiusKm: 50,
+    searchZoneCenter: {
+      lat: 47.73655265353601,
+      lng: 13.672485351562502,
+    },
+  },
+];
+
+/**
  * Default inspirational curated places across Austria
  */
 function getDefaultCuratedPlaces(): CuratedPlace[] {
-  return [
-    {
-      id: 'curated-gruttenhuette',
-      name: 'Gruttenhütte am Wilden Kaiser',
-      subname: 'Blick auf Ellmauer Halt (2.344m) und Treffauer',
-      mountainRange: 'Kaisergebirge',
-      bundesland: 'Tirol',
-      observerPos: { lat: 47.5512, lng: 12.3168 },
-      observerElevation: 1620,
-      initialHeading: 340,
-      description: 'Hoch über Ellmau thronende Hütte mit direktem Blick in die schroffen Südwände der Kaiserberge.',
-      createdAt: '2026-09-01T12:00:00.000Z',
-      targetPeakName: 'Ellmauer Halt',
-    },
-    {
-      id: 'curated-krippenstein',
-      name: 'Krippenstein Fünf-Finger-Kanzel',
-      subname: 'Gletscher-Panorama Hoher Dachstein (2.995m)',
-      mountainRange: 'Dachsteingebirge',
-      bundesland: 'Oberösterreich',
-      observerPos: { lat: 47.5255, lng: 13.6933 },
-      observerElevation: 2108,
-      initialHeading: 245,
-      description: 'Atemberaubende Aussichtskanzel hoch über Hallstatt mit Blick auf das ewige Eis des Hallstätter Gletschers.',
-      createdAt: '2026-09-01T12:00:00.000Z',
-      targetPeakName: 'Hoher Dachstein',
-    },
-    {
-      id: 'curated-bielerhoehe',
-      name: 'Bielerhöhe Silvretta-Stausee',
-      subname: 'Silvretta-Panorama & Piz Buin (3.312m)',
-      mountainRange: 'Silvretta',
-      bundesland: 'Vorarlberg',
-      observerPos: { lat: 46.9178, lng: 10.0933 },
-      observerElevation: 2037,
-      initialHeading: 175,
-      description: 'Hoher Alpenpass an der Grenze zwischen Tirol und Vorarlberg mit Blick auf die gletscherbedeckten Silvretta-Gipfel.',
-      createdAt: '2026-09-01T12:00:00.000Z',
-      targetPeakName: 'Großer Piz Buin',
-    },
-  ];
+  return PLAYTEST_CAMPAIGN_PLACES;
 }

@@ -17,7 +17,7 @@ export interface SavedCampaignProgress {
   completed?: boolean;
 }
 
-const COOKIE_NAME = 'topoguesser_campaign_v2';
+const COOKIE_NAME = 'topoguesser_campaign_playtest_v1';
 
 export function setCookie(name: string, value: string, days = 30): void {
   try {
