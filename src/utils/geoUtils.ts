@@ -101,3 +101,36 @@ export function formatCoordinates(pos: LatLng): string {
   };
   return `${formatCoord(pos.lat, true)} · ${formatCoord(pos.lng, false)}`;
 }
+
+/**
+ * Formats seconds into a human-friendly duration string (e.g. "45s", "2m 15s", "1h 12m").
+ */
+export function formatDuration(seconds: number): string {
+  const totalSec = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${secs.toString().padStart(2, '0')}s`;
+  }
+  return `${secs}s`;
+}
+
+/**
+ * Formats seconds into a digital stopwatch timer string (e.g. "00:45", "02:15", "1:12:05").
+ */
+export function formatDigitalTimer(seconds: number): string {
+  const totalSec = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}

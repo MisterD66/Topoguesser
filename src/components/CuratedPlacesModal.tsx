@@ -26,6 +26,7 @@ interface CuratedPlacesModalProps {
   onPlayPlace: (place: CuratedPlace) => void;
   onDeletePlace: (id: string) => void;
   onImportPlaces: (jsonStr: string) => void;
+  onDownloadCampaign?: () => void;
   onClose: () => void;
 }
 
@@ -35,6 +36,7 @@ export const CuratedPlacesModal: React.FC<CuratedPlacesModalProps> = ({
   onPlayPlace,
   onDeletePlace,
   onImportPlaces,
+  onDownloadCampaign,
   onClose,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -129,10 +131,21 @@ export const CuratedPlacesModal: React.FC<CuratedPlacesModalProps> = ({
               <span>{copied ? 'Kopiert!' : 'Kopieren'}</span>
             </button>
 
+            {onDownloadCampaign && (
+              <button
+                onClick={onDownloadCampaign}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                title="Als Kampagnendatei (.campaign.json) herunterladen"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+                <span>Kampagne (.campaign.json)</span>
+              </button>
+            )}
+
             <button
               onClick={handleDownloadJSON}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
-              title="JSON-Datei herunterladen"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+              title="Rohe JSON-Ortsliste herunterladen"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export</span>

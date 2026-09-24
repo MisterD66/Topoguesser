@@ -13,6 +13,7 @@ export interface SavedCampaignProgress {
     score: number;
     distanceKm: number;
     guessLatLng: { lat: number; lng: number } | null;
+    timeSpentSec?: number;
   }>;
   completed?: boolean;
 }

@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Move,
   RotateCw,
+  Download,
 } from 'lucide-react';
 
 interface CreatorControlBarProps {
@@ -50,6 +51,7 @@ interface CreatorControlBarProps {
   distanceToCenterKm?: number;
   onSavePlace: () => void;
   onOpenCuratedModal: () => void;
+  onDownloadCampaign?: () => void;
   onTestPlay: () => void;
   savedCount: number;
   justSaved: boolean;
@@ -83,6 +85,7 @@ export const CreatorControlBar: React.FC<CreatorControlBarProps> = ({
   distanceToCenterKm = 0,
   onSavePlace,
   onOpenCuratedModal,
+  onDownloadCampaign,
   onTestPlay,
   savedCount,
   justSaved,
@@ -238,6 +241,17 @@ export const CreatorControlBar: React.FC<CreatorControlBarProps> = ({
                 {savedCount}
               </span>
             </button>
+
+            {onDownloadCampaign && (
+              <button
+                onClick={onDownloadCampaign}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 border border-stone-700 text-xs font-medium text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
+                title="Aktuelle Orte als .campaign.json herunterladen"
+              >
+                <Download className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">Download</span>
+              </button>
+            )}
 
             <button
               onClick={onTestPlay}

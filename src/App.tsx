@@ -11,7 +11,7 @@ import {
   LatLng,
   CuratedPlace,
 } from './types/game';
-import { AUSTRIAN_LOCATIONS } from './data/austrianLocations';
+import { CampaignMeta, CampaignFile } from './types/campaign';
 import { calculateDistanceKm, calculateScore } from './utils/geoUtils';
 import {
   loadCuratedPlaces,
@@ -21,14 +21,17 @@ import {
   synthesizeLocationFromCoord,
   convertCuratedToAlpineLocation,
   estimateElevation,
-  PLAYTEST_CAMPAIGN_PLACES,
 } from './utils/curatedPlaces';
 import {
-  saveCampaignCookie,
-  loadCampaignCookie,
-  clearCampaignCookie,
-} from './utils/cookieStorage';
+  getAllCampaigns,
+  fetchExternalCampaigns,
+  saveCustomCampaign,
+  loadCampaignProgress,
+  saveCampaignProgress,
+  clearCampaignProgress,
+} from './utils/campaignLoader';
 
+import { StartScreen } from './components/StartScreen';
 import { TopBar } from './components/TopBar';
 import { Horizon3DView } from './components/Horizon3DView';
 import { TopoMap2D } from './components/TopoMap2D';
@@ -37,86 +40,112 @@ import { RoundResultModal } from './components/RoundResultModal';
 import { CampaignSummaryModal } from './components/CampaignSummaryModal';
 import { CreatorControlBar } from './components/CreatorControlBar';
 import { CuratedPlacesModal } from './components/CuratedPlacesModal';
-
-const TOTAL_ROUNDS = 5;
+import { CampaignExportModal } from './components/CampaignExportModal';
 
 export default function App() {
-  // Mode: Only 'campaign' (curated 5-round playtest game) or 'creator' (unlocked via password)
+  // Campaign registry (all .campaign.json in src/campaigns/ + custom user imports + runtime docs/campaigns/)
+  const [allCampaigns, setAllCampaigns] = useState<CampaignMeta[]>(() => getAllCampaigns());
+
+  // Load external campaigns from docs/campaigns/ (or public/campaigns/) asynchronously at startup
+  useEffect(() => {
+    fetchExternalCampaigns().then((camps) => {
+      setAllCampaigns(camps);
+    });
+  }, []);
+
+  // Active playing campaign: null = show StartScreen
+  const [activeCampaign, setActiveCampaign] = useState<CampaignMeta | null>(null);
+
+  // Mode: 'campaign' (playing active campaign or test play) or 'creator' (interactive editor)
   const [gameMode, setGameMode] = useState<GameMode>('campaign');
 
-  // Curated Places collection from localStorage
+  // Curated Places collection in Creator Mode (stored in localStorage)
   const [curatedPlaces, setCuratedPlaces] = useState<CuratedPlace[]>(() => loadCuratedPlaces());
 
-  // Build the 5 campaign locations exclusively from the playtest curated places
+  // Locations of the active campaign
   const campaignLocations = useMemo<AlpineLocation[]>(() => {
-    const list: AlpineLocation[] = [];
-
-    // Prioritize places from curated storage if 5 exist
-    if (curatedPlaces && curatedPlaces.length >= TOTAL_ROUNDS) {
-      for (const place of curatedPlaces) {
-        list.push(convertCuratedToAlpineLocation(place));
-        if (list.length >= TOTAL_ROUNDS) break;
-      }
-    } else {
-      // Use the canonical 5 playtest locations
-      for (const place of PLAYTEST_CAMPAIGN_PLACES) {
-        list.push(convertCuratedToAlpineLocation(place));
-        if (list.length >= TOTAL_ROUNDS) break;
-      }
+    if (!activeCampaign || !activeCampaign.places || activeCampaign.places.length === 0) {
+      return [];
     }
+    return activeCampaign.places.map((p) => convertCuratedToAlpineLocation(p));
+  }, [activeCampaign]);
 
-    return list.slice(0, TOTAL_ROUNDS);
-  }, [curatedPlaces]);
+  const totalRounds = campaignLocations.length || 5;
 
-  // Round progression (0 to 9) and points
+  // Round progression and history
   const [roundIndex, setRoundIndex] = useState<number>(0);
   const [roundsHistory, setRoundsHistory] = useState<RoundResult[]>([]);
   const [testPlayLocation, setTestPlayLocation] = useState<AlpineLocation | null>(null);
 
-  // Restore saved campaign progress and points from cookies on mount
-  useEffect(() => {
-    const saved = loadCampaignCookie();
-    if (saved) {
-      if (typeof saved.roundIndex === 'number' && saved.roundIndex >= 0 && saved.roundIndex < TOTAL_ROUNDS) {
+  // Select campaign from Start Screen
+  const handleSelectCampaign = (camp: CampaignMeta, resumeFromSaved = false) => {
+    setActiveCampaign(camp);
+    setGameMode('campaign');
+    setTestPlayLocation(null);
+
+    if (resumeFromSaved) {
+      const saved = loadCampaignProgress(camp.id);
+      if (saved && saved.roundIndex >= 0 && saved.roundIndex < camp.places.length) {
         setRoundIndex(saved.roundIndex);
-      }
-      if (Array.isArray(saved.roundsHistory) && saved.roundsHistory.length > 0) {
-        const reconstructed: RoundResult[] = saved.roundsHistory.map((h) => {
-          const loc = campaignLocations.find((l) => l.id === h.locationId) || campaignLocations[0];
-          return {
-            roundNumber: h.roundNumber,
-            location: loc,
-            guessLatLng: h.guessLatLng || { lat: loc.observerPos.lat, lng: loc.observerPos.lng },
-            distanceKm: h.distanceKm,
-            elevationDiffM: 0,
-            score: h.score,
-            timeSpentSec: 0,
-          };
-        });
-        setRoundsHistory(reconstructed);
+        if (Array.isArray(saved.roundsHistory)) {
+          const reconstructed: RoundResult[] = saved.roundsHistory.map((h) => {
+            const loc =
+              camp.places.find((p) => p.id === h.locationId) || camp.places[0];
+            return {
+              roundNumber: h.roundNumber,
+              location: convertCuratedToAlpineLocation(loc),
+              guessLatLng: h.guessLatLng || { lat: loc.observerPos.lat, lng: loc.observerPos.lng },
+              distanceKm: h.distanceKm,
+              elevationDiffM: 0,
+              score: h.score,
+              timeSpentSec: 0,
+            };
+          });
+          setRoundsHistory(reconstructed);
+          return;
+        }
       }
     }
-  }, [campaignLocations]);
+
+    // Fresh start
+    setRoundIndex(0);
+    setRoundsHistory([]);
+  };
+
+  // Import custom campaign from JSON
+  const handleImportCampaign = (campaignData: CampaignFile) => {
+    saveCustomCampaign(campaignData);
+    const updated = getAllCampaigns();
+    setAllCampaigns(updated);
+    const imported = updated.find((c) => c.id === campaignData.id) || updated[0];
+    if (imported) {
+      handleSelectCampaign(imported, false);
+    }
+  };
 
   // Creator Mode State
-  const [creatorPos, setCreatorPos] = useState<LatLng>({ lat: 47.5512, lng: 12.3168 });
-  const [creatorElevation, setCreatorElevation] = useState<number>(1620);
-  const [creatorName, setCreatorName] = useState<string>('Gruttenhütte Blick (Wilder Kaiser)');
-  const [creatorMountainRange, setCreatorMountainRange] = useState<string>('Kaisergebirge · Tirol');
-  const [creatorDescription, setCreatorDescription] = useState<string>('Aussichtspunkt auf die markante Südwand des Wilden Kaisers');
+  const [creatorPos, setCreatorPos] = useState<LatLng>({ lat: 47.79156, lng: 13.47258 });
+  const [creatorElevation, setCreatorElevation] = useState<number>(1290);
+  const [creatorName, setCreatorName] = useState<string>('Adlerstein');
+  const [creatorMountainRange, setCreatorMountainRange] = useState<string>('Schafberg-Region · Oberösterreich');
+  const [creatorDescription, setCreatorDescription] = useState<string>('Aussichtspunkt auf die markante Schafberg-Flanke');
   const [creatorTimeHour, setCreatorTimeHour] = useState<number>(14);
   const [creatorDifficulty, setCreatorDifficulty] = useState<'standard' | 'hard'>('standard');
   const [creatorShowSearchZone, setCreatorShowSearchZone] = useState<boolean>(true);
   const [creatorSearchZoneRadiusKm, setCreatorSearchZoneRadiusKm] = useState<number>(50);
-  const [creatorSearchZoneCenter, setCreatorSearchZoneCenter] = useState<LatLng | null>(null);
+  const [creatorSearchZoneCenter, setCreatorSearchZoneCenter] = useState<LatLng | null>({
+    lat: 47.73655,
+    lng: 13.67248,
+  });
   const [creatorActiveTool, setCreatorActiveTool] = useState<'camera' | 'searchZone'>('camera');
   const [showCuratedModal, setShowCuratedModal] = useState<boolean>(false);
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [justSavedPlace, setJustSavedPlace] = useState<boolean>(false);
 
-  // Auto-offset search circle around camera (not centered, natural alpine placement)
+  // Auto-offset search circle around camera
   const handleAutoOffsetSearchZone = useCallback(() => {
     const offsetKm = Math.min(creatorSearchZoneRadiusKm * 0.45, 22);
-    const angleRad = (Math.PI / 180) * 55; // 55 degrees North-East
+    const angleRad = (Math.PI / 180) * 55;
     const cosLat = Math.cos((creatorPos.lat * Math.PI) / 180);
     const dLat = (offsetKm * Math.cos(angleRad)) / 111.0;
     const dLng = (offsetKm * Math.sin(angleRad)) / (111.0 * cosLat);
@@ -172,7 +201,7 @@ export default function App() {
   ]);
 
   // Player interaction state
-  const [headingDeg, setHeadingDeg] = useState<number>(currentLocation.initialHeading);
+  const [headingDeg, setHeadingDeg] = useState<number>(currentLocation ? currentLocation.initialHeading : 0);
   const [guessLatLng, setGuessLatLng] = useState<LatLng | null>(null);
   const [isRoundComplete, setIsRoundComplete] = useState<boolean>(false);
   const [currentRoundResult, setCurrentRoundResult] = useState<RoundResult | null>(null);
@@ -188,7 +217,7 @@ export default function App() {
 
   // Reset round state when location changes (in campaign mode)
   useEffect(() => {
-    if (gameMode !== 'creator') {
+    if (gameMode !== 'creator' && currentLocation) {
       setHeadingDeg(currentLocation.initialHeading);
       setGuessLatLng(null);
       setIsRoundComplete(false);
@@ -306,7 +335,7 @@ export default function App() {
     }
   };
 
-  // Submit Guess & Calculate Score (Save to Cookies)
+  // Submit Guess & Calculate Score
   const handleSubmitGuess = () => {
     if (!guessLatLng || isRoundComplete) return;
 
@@ -329,9 +358,9 @@ export default function App() {
     const nextHistory = [...roundsHistory, result];
     setRoundsHistory(nextHistory);
 
-    // Save progress and points to cookies
-    if (!testPlayLocation) {
-      saveCampaignCookie({
+    // Persist per-campaign progress
+    if (activeCampaign && !testPlayLocation) {
+      saveCampaignProgress(activeCampaign.id, {
         roundIndex,
         totalScore: nextHistory.reduce((sum, r) => sum + r.score, 0),
         roundsHistory: nextHistory.map((r) => ({
@@ -345,7 +374,6 @@ export default function App() {
       });
     }
 
-    // Show round result modal
     setTimeout(() => {
       setShowRoundResult(true);
     }, 1100);
@@ -359,37 +387,54 @@ export default function App() {
     setCurrentRoundResult(null);
 
     if (testPlayLocation) {
-      // Return to creator mode after test play
       setTestPlayLocation(null);
       setGameMode('creator');
       return;
     }
 
     const nextIndex = roundIndex + 1;
-    if (nextIndex < TOTAL_ROUNDS) {
+    if (nextIndex < totalRounds) {
       setRoundIndex(nextIndex);
-      // Update cookie with next round
-      saveCampaignCookie({
-        roundIndex: nextIndex,
-        totalScore,
-        roundsHistory: roundsHistory.map((r) => ({
-          roundNumber: r.roundNumber,
-          locationId: r.location.id,
-          locationName: r.location.name,
-          score: r.score,
-          distanceKm: r.distanceKm,
-          guessLatLng: r.guessLatLng,
-        })),
-      });
+      if (activeCampaign) {
+        saveCampaignProgress(activeCampaign.id, {
+          roundIndex: nextIndex,
+          totalScore,
+          roundsHistory: roundsHistory.map((r) => ({
+            roundNumber: r.roundNumber,
+            locationId: r.location.id,
+            locationName: r.location.name,
+            score: r.score,
+            distanceKm: r.distanceKm,
+            guessLatLng: r.guessLatLng,
+          })),
+        });
+      }
     } else {
-      // Campaign Completed (10 Rounds)!
+      // Completed! Mark completed in storage
+      if (activeCampaign) {
+        saveCampaignProgress(activeCampaign.id, {
+          roundIndex: totalRounds,
+          totalScore,
+          completed: true,
+          roundsHistory: roundsHistory.map((r) => ({
+            roundNumber: r.roundNumber,
+            locationId: r.location.id,
+            locationName: r.location.name,
+            score: r.score,
+            distanceKm: r.distanceKm,
+            guessLatLng: r.guessLatLng,
+          })),
+        });
+      }
       setShowCampaignSummary(true);
     }
   };
 
-  // Restart Campaign (Reset cookies, start fresh)
+  // Restart Active Campaign
   const handleRestartCampaign = () => {
-    clearCampaignCookie();
+    if (activeCampaign) {
+      clearCampaignProgress(activeCampaign.id);
+    }
     setRoundIndex(0);
     setRoundsHistory([]);
     setGuessLatLng(null);
@@ -399,58 +444,109 @@ export default function App() {
     setShowCampaignSummary(false);
   };
 
-  // Difficulty check: 'hard' = no compass, no visier
-  const isHardDifficulty = currentLocation.difficulty === 'hard';
+  // Back to Start Screen
+  const handleBackToStartScreen = () => {
+    setActiveCampaign(null);
+    setGameMode('campaign');
+    setTestPlayLocation(null);
+    setShowCampaignSummary(false);
+    setShowRoundResult(false);
+    fetchExternalCampaigns().then((camps) => {
+      setAllCampaigns(camps);
+    });
+  };
 
+  // Difficulty check: 'hard' = no compass, no visier
+  const isHardDifficulty = currentLocation?.difficulty === 'hard';
+
+  // 1. RENDER START SCREEN if no active campaign and not in creator mode
+  if (!activeCampaign && gameMode !== 'creator') {
+    return (
+      <div className="w-full h-full">
+        <StartScreen
+          campaigns={allCampaigns}
+          onSelectCampaign={(c, resume) => handleSelectCampaign(c, resume)}
+          onOpenCreator={() => setShowPasswordModal(true)}
+          onResetProgress={(id) => {
+            clearCampaignProgress(id);
+            setAllCampaigns(getAllCampaigns());
+          }}
+        />
+
+        {/* Password Modal to unlock Creator Mode from Start Screen */}
+        <CreatorPasswordModal
+          isOpen={showPasswordModal}
+          isCreatorMode={false}
+          onUnlockCreator={() => {
+            setGameMode('creator');
+            setShowPasswordModal(false);
+          }}
+          onExitCreator={() => {
+            setGameMode('campaign');
+            setShowPasswordModal(false);
+          }}
+          onClose={() => setShowPasswordModal(false)}
+        />
+      </div>
+    );
+  }
+
+  // 2. RENDER MAIN GAME VIEWPORT OR CREATOR MODE
   return (
     <div className="flex flex-col w-full h-full bg-stone-950 text-stone-100 overflow-hidden select-none">
-      {/* 1. Ultra-clean Header: Only "Round X/10", "X pts", and Settings/Gear icon */}
+      {/* Ultra-clean Header */}
       <TopBar
         roundNumber={testPlayLocation ? 1 : roundIndex + 1}
-        totalRounds={TOTAL_ROUNDS}
+        totalRounds={totalRounds}
         totalScore={totalScore}
+        campaignTitle={activeCampaign?.title}
         isCreatorMode={gameMode === 'creator'}
+        onBackToStartScreen={handleBackToStartScreen}
         onOpenSettings={() => setShowPasswordModal(true)}
       />
 
-      {/* 2. Main Split Viewport (Top: 3D Panorama, Bottom: 2D Topo Map) */}
+      {/* Main Split Viewport */}
       <main className="flex-1 flex flex-col lg:flex-row w-full h-[calc(100%-2.75rem)] overflow-hidden relative">
-        {/* Top Half (Left on Desktop): 3D Horizon Panorama */}
+        {/* Top Half: 3D Horizon Panorama */}
         <section className="h-[48%] lg:h-full lg:w-1/2 relative border-b lg:border-b-0 lg:border-r border-stone-800 shrink-0">
-          <Horizon3DView
-            location={currentLocation}
-            headingDeg={headingDeg}
-            onHeadingChange={setHeadingDeg}
-            showCompassTape={true}
-            timeOfDayHour={currentLocation.timeOfDayHour ?? creatorTimeHour}
-            onTimeChange={(h) => setCreatorTimeHour(h)}
-            isCreatorMode={gameMode === 'creator'}
-            hideCompassAndVisier={isHardDifficulty}
-          />
+          {currentLocation && (
+            <Horizon3DView
+              location={currentLocation}
+              headingDeg={headingDeg}
+              onHeadingChange={setHeadingDeg}
+              showCompassTape={true}
+              timeOfDayHour={currentLocation.timeOfDayHour ?? creatorTimeHour}
+              onTimeChange={(h) => setCreatorTimeHour(h)}
+              isCreatorMode={gameMode === 'creator'}
+              hideCompassAndVisier={isHardDifficulty}
+            />
+          )}
         </section>
 
-        {/* Bottom Half (Right on Desktop): 2D OpenTopoMap with alternating red-blue dashed circle */}
+        {/* Bottom Half: 2D Topo Map */}
         <section className="h-[52%] lg:h-full lg:w-1/2 relative flex-1">
-          <TopoMap2D
-            location={currentLocation}
-            headingDeg={headingDeg}
-            showVisionCone={false}
-            guessLatLng={guessLatLng}
-            onGuessChange={handleGuessChange}
-            onSubmitGuess={handleSubmitGuess}
-            isRoundComplete={isRoundComplete}
-            roundScore={currentRoundResult?.score}
-            isCreatorMode={gameMode === 'creator'}
-            creatorPin={creatorPos}
-            onCreatorPinChange={handleCreatorPinChange}
-            creatorSearchZoneCenter={creatorSearchZoneCenter}
-            onCreatorSearchZoneCenterChange={setCreatorSearchZoneCenter}
-            creatorActiveTool={creatorActiveTool}
-          />
+          {currentLocation && (
+            <TopoMap2D
+              location={currentLocation}
+              headingDeg={headingDeg}
+              showVisionCone={false}
+              guessLatLng={guessLatLng}
+              onGuessChange={handleGuessChange}
+              onSubmitGuess={handleSubmitGuess}
+              isRoundComplete={isRoundComplete}
+              roundScore={currentRoundResult?.score}
+              isCreatorMode={gameMode === 'creator'}
+              creatorPin={creatorPos}
+              onCreatorPinChange={handleCreatorPinChange}
+              creatorSearchZoneCenter={creatorSearchZoneCenter}
+              onCreatorSearchZoneCenterChange={setCreatorSearchZoneCenter}
+              creatorActiveTool={creatorActiveTool}
+            />
+          )}
         </section>
       </main>
 
-      {/* 3. Creator Mode Control & Save Dock (Shown ONLY in Creator Mode) */}
+      {/* Creator Mode Control & Save Dock */}
       {gameMode === 'creator' && (
         <CreatorControlBar
           creatorPos={creatorPos}
@@ -479,13 +575,14 @@ export default function App() {
           distanceToCenterKm={distanceCamToCircleKm}
           onSavePlace={handleSaveCurrentPlace}
           onOpenCuratedModal={() => setShowCuratedModal(true)}
+          onDownloadCampaign={() => setShowExportModal(true)}
           onTestPlay={handleTestPlayCurrent}
           savedCount={curatedPlaces.length}
           justSaved={justSavedPlace}
         />
       )}
 
-      {/* 4. Password Modal behind the Gear Icon */}
+      {/* Password Modal */}
       <CreatorPasswordModal
         isOpen={showPasswordModal}
         isCreatorMode={gameMode === 'creator'}
@@ -500,7 +597,7 @@ export default function App() {
         onClose={() => setShowPasswordModal(false)}
       />
 
-      {/* 5. Curated Places Collection Modal */}
+      {/* Curated Places Collection Modal */}
       {showCuratedModal && (
         <CuratedPlacesModal
           places={curatedPlaces}
@@ -508,26 +605,41 @@ export default function App() {
           onPlayPlace={handlePlayCuratedPlace}
           onDeletePlace={handleDeleteCuratedPlace}
           onImportPlaces={handleImportCuratedPlaces}
+          onDownloadCampaign={() => {
+            setShowCuratedModal(false);
+            setShowExportModal(true);
+          }}
           onClose={() => setShowCuratedModal(false)}
         />
       )}
 
-      {/* 6. Round Result Modal */}
+      {/* Campaign Export & Download Modal */}
+      <CampaignExportModal
+        places={curatedPlaces}
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onCampaignCreated={(camp) => {
+          const updated = getAllCampaigns();
+          setAllCampaigns(updated);
+        }}
+      />
+
+      {/* Round Result Modal */}
       {showRoundResult && currentRoundResult && (
         <RoundResultModal
           result={currentRoundResult}
           roundNumber={testPlayLocation ? 1 : roundIndex + 1}
-          totalRounds={TOTAL_ROUNDS}
+          totalRounds={totalRounds}
           onNextRound={handleNextRound}
-          isLastRound={!testPlayLocation && roundIndex === TOTAL_ROUNDS - 1}
+          isLastRound={!testPlayLocation && roundIndex === totalRounds - 1}
         />
       )}
 
-      {/* 7. Campaign Summary Modal (After Round 10) */}
+      {/* Campaign Summary Modal */}
       <CampaignSummaryModal
         isOpen={showCampaignSummary}
         totalScore={totalScore}
-        maxScore={TOTAL_ROUNDS * 5000}
+        maxScore={totalRounds * 5000}
         rounds={roundsHistory.map((r) => ({
           roundNumber: r.roundNumber,
           locationName: r.location.name,
@@ -535,7 +647,7 @@ export default function App() {
           score: r.score,
         }))}
         onRestart={handleRestartCampaign}
-        onClose={() => setShowCampaignSummary(false)}
+        onClose={handleBackToStartScreen}
       />
     </div>
   );

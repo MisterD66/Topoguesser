@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { RoundResult } from '../types/game';
-import { formatDistance } from '../utils/geoUtils';
-import { ArrowRight, Mountain } from 'lucide-react';
+import { formatDistance, formatDuration } from '../utils/geoUtils';
+import { ArrowRight, Mountain, Timer } from 'lucide-react';
 
 interface RoundResultModalProps {
   result: RoundResult;
@@ -23,7 +23,7 @@ export const RoundResultModal: React.FC<RoundResultModalProps> = ({
   onNextRound,
   isLastRound,
 }) => {
-  const { location, distanceKm, score } = result;
+  const { location, distanceKm, score, timeSpentSec } = result;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -34,6 +34,12 @@ export const RoundResultModal: React.FC<RoundResultModalProps> = ({
             <Mountain className="w-4 h-4 text-amber-500" />
             <span>Round {roundNumber} of {totalRounds}</span>
           </div>
+          {typeof timeSpentSec === 'number' && timeSpentSec > 0 && (
+            <div className="flex items-center gap-1 text-xs text-stone-400 font-mono-numbers">
+              <Timer className="w-3.5 h-3.5 text-amber-400" />
+              <span>{formatDuration(timeSpentSec)}</span>
+            </div>
+          )}
         </div>
 
         <div className="p-5 space-y-5">
@@ -43,8 +49,18 @@ export const RoundResultModal: React.FC<RoundResultModalProps> = ({
             <div className="text-4xl sm:text-5xl font-extrabold text-amber-400 font-mono-numbers mt-1">
               +{score.toLocaleString()}
             </div>
-            <div className="text-xs text-stone-400 mt-1 font-mono-numbers">
-              Distance error: <strong className="text-white">{formatDistance(distanceKm)}</strong>
+            <div className="flex items-center justify-center gap-3 text-xs text-stone-400 mt-2 font-mono-numbers">
+              <span>
+                Abweichung: <strong className="text-white">{formatDistance(distanceKm)}</strong>
+              </span>
+              {typeof timeSpentSec === 'number' && timeSpentSec > 0 && (
+                <>
+                  <span className="text-stone-600">·</span>
+                  <span>
+                    Zeit: <strong className="text-white">{formatDuration(timeSpentSec)}</strong>
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
